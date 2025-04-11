@@ -13,12 +13,17 @@ from .models import Transaction
 from app.database import get_db
 from sqlalchemy.orm import Session
 from app.models import Transaction
+from fastapi import APIRouter, Depends
+from . import parser, crud, models
+from app.routes import router
+from app import routes
 import re
 
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+app.include_router(router)
 
 class SMSRequest(BaseModel):
     sms_text: str
@@ -66,6 +71,11 @@ def parse_sms(request: SMSRequest, db=Depends(get_db)):
         "category": txn.category,
         "merchant": txn.merchant
     }
+def add_transaction(sms_text: dict, db: Session = Depends(get_db)):
+    parsed = parser.parse_sms(sms_text["sms_text"])
+    crud.create_transaction(db=db, **parsed)
+    return parsed
+
 
 @app.get("/summary")
 def summary(budget: float = Query(...), db: Session = Depends(get_db)):
@@ -89,6 +99,19 @@ def parse_and_save_sms(msg: str = Body(...), db: Session = Depends(get_db)):
     db.commit()
 
     return {"status": "success", "parsed": parsed, "category": category}
+
+@app.post("/budget")
+def update_budget(budget: float, db: Session = Depends(get_db)):
+    setting = db.query(models.Settings).first()
+    if not setting:
+        setting = models.Settings(monthly_budget=budget)
+        db.add(setting)
+    else:
+        setting.monthly_budget = budget
+    db.commit()
+    return {"message": "Budget updated", "budget": budget}
+
+
 
 from app.database import Base, engine
 Base.metadata.create_all(bind=engine)

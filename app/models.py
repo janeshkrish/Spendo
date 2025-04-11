@@ -9,3 +9,8 @@ class Transaction(Base):
     date = Column(Date, nullable=False)
     category = Column(String, nullable=False)
     merchant = Column(String, nullable=False)
+
+class Settings(Base):
+    __tablename__ = "settings"
+    id = Column(Integer, primary_key=True, index=True)
+    monthly_budget = Column(Float)
